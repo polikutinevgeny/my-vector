@@ -161,6 +161,51 @@ TEST_CASE("Assigns") {
         REQUIRE(ok);
     }
     SECTION("Init list assign") {
-        
+        vector<int> test = { 0, 1, 2, 3, 4, 5 };
+        test = { 5, 6, 7 };
+        REQUIRE(test.size() == 3);
+        REQUIRE(test.capacity() >= 3);
+        bool ok = true;
+        for (int i = 0; i < test.size(); ++i) {
+            ok = ok && test[i] == i + 5;
+        }
+        REQUIRE(ok);
+    }
+}
+
+TEST_CASE("Iterators") {
+    SECTION("Vector with elements") {
+        vector<int> test = { 0, 1, 2, 3, 4, 5 };
+        auto it = test.begin();
+        REQUIRE(*it == 0);
+        it = test.end() - 1;
+        REQUIRE(it == test.end() - 1);
+        {
+            bool ok = true;
+            int c = 0;
+            for (auto i = test.begin(); i != test.end(); ++i, ++c) {
+                ok = ok && *i == c;
+            }
+            REQUIRE(ok);
+        }
+        {
+            bool ok = true;
+            int c = 5;
+            for (auto i = test.end() - 1;; --i, --c) {
+                ok = ok && *i == c;
+                if (i == test.begin()) {
+                    break;
+                }
+            }
+            REQUIRE(ok);
+        }
+        REQUIRE(test.begin() < test.end());
+        REQUIRE(test.end() > test.begin());
+        REQUIRE(test.begin() <= test.end());
+        REQUIRE(test.end() >= test.begin());
+        REQUIRE(it == test.begin() + 5);
+        REQUIRE(it != test.end());
+        REQUIRE(it++ == test.end() - 1);
+        REQUIRE(it-- == test.end());
     }
 }

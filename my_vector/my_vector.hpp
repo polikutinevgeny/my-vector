@@ -33,9 +33,9 @@ public:
         bool operator<= (const iterator& other) { return real_pos() <= other.real_pos(); };
 
         iterator& operator++() { add(1); return *this; };
-        iterator operator++(int) { iterator it(*this); it.add(1); return it; };
+        iterator operator++(int) { iterator it(*this); add(1); return it; };
         iterator& operator--() { substract(1); return *this; };
-        iterator operator--(int) { iterator it(*this); it.substract(1); return it; };
+        iterator operator--(int) { iterator it(*this); substract(1); return it; };
         iterator& operator+=(size_type n) { add(n); return *this; };
         iterator operator+(size_type n) const { iterator it(*this); it.add(n); return it; };
         friend iterator operator+(size_type n, const iterator& that) { iterator it(that); it.add(n); return it; };
@@ -146,9 +146,10 @@ void vector<T>::allocate_more(size_type n) {
 }
 
 template <class T>
-typename vector<T>::iterator& vector<T>::iterator::operator=(const iterator& other) { 
-    std::swap(pos_, other.pos_);
-    std::swap(container_, other.container_);
+typename vector<T>::iterator& vector<T>::iterator::operator=(const iterator& other) {
+    auto tmp(other);
+    std::swap(pos_, tmp.pos_);
+    std::swap(container_, tmp.container_);
     return *this;
 }
 
@@ -165,7 +166,7 @@ void vector<T>::iterator::add(size_type n) {
 
 template <class T>
 void vector<T>::iterator::substract(size_type n) {
-    if (pos_ == nullptr) {
+    if (pos_ == nullptr && n > 0) {
         pos_ = container_->elements_ + container_->size_;
     }
     pos_ -= n;
