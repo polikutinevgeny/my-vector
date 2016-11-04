@@ -87,7 +87,7 @@ public:
     iterator end() noexcept { return iterator(this, nullptr); }
 
     size_type size() const noexcept { return size_; }
-    size_type max_size() const noexcept { return std::numeric_limits<size_type>::max(); }
+    size_type max_size() const noexcept { return std::numeric_limits<size_type>::max() / 4; }
     void resize(size_type sz);
     void resize(size_type sz, const T& c);
     size_type capacity() const noexcept { return capacity_; }
@@ -137,12 +137,12 @@ void vector<T>::allocate(size_type n) {
 
 template<class T>
 void vector<T>::allocate_more(size_type n) {
-    T* old = elements_;
     size_type new_capacity = static_cast<size_type>(std::floor(pow(2, std::floor(std::log2(n)) + 1)));
-    elements_ = new T[new_capacity];
+    T* new_elements = new T[new_capacity];
+    std::copy(elements_, elements_ + size_, new_elements);
+    delete[] elements_;
     capacity_ = new_capacity;
-    std::copy(old, old + size_, elements_);
-    delete[] old;
+    elements_ = new_elements;
 }
 
 template <class T>
@@ -218,9 +218,7 @@ vector<T>::vector(const vector& x) : size_(x.size_) {
 
 template <class T>
 vector<T>::vector(vector&& x) noexcept : elements_(nullptr), size_(0), capacity_(0) {
-    std::swap(elements_, x.elements_);
-    std::swap(size_, x.size_);
-    std::swap(capacity_, x.capacity_);
+    swap(x);
 }
 
 template <class T>
@@ -251,7 +249,7 @@ template <class T>
 vector<T>& vector<T>::operator=(std::initializer_list<T> l) {
     size_ = l.size();
     allocate(size_);
-    std::copy(l.begin(), l.end(), elements_);
+    std::move(l.begin(), l.end(), elements_);
     return *this;
 }
 

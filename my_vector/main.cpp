@@ -236,7 +236,7 @@ TEST_CASE("Iterators") {
 
 TEST_CASE("Size management") {
     vector<int> test(10U, 13);
-    REQUIRE(test.max_size() == std::numeric_limits<vector<int>::size_type>::max());
+    REQUIRE(test.max_size() == std::numeric_limits<vector<int>::size_type>::max() / 4);
     REQUIRE(test.size() == 10);
     REQUIRE(test.capacity() >= 10);
     test.resize(15);
@@ -520,4 +520,5 @@ TEST_CASE("Misc") {
     test.clear();
     REQUIRE(test.size() == 0);
     REQUIRE(test.capacity() == 0);
+    CHECK_THROWS_AS(test.reserve(test.max_size()), std::bad_alloc);
 }
