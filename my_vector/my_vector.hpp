@@ -92,7 +92,7 @@ public:
     void resize(size_type sz, const T& c);
     size_type capacity() const noexcept { return capacity_; }
     bool empty() const noexcept { return size_ == 0; }
-    void reserve(size_type n) { allocate_more(n); }
+    void reserve(size_type n) { if (n > capacity_) allocate_more(n); }
     void shrink_to_fit() { allocate_more(size_); }
 
     reference operator[](size_type n) { return elements_[n]; }
@@ -138,7 +138,7 @@ void vector<T>::allocate(size_type n) {
 template<class T>
 void vector<T>::allocate_more(size_type n) {
     T* old = elements_;
-    size_type new_capacity = std::floor(pow(2, std::floor(std::log2(n)) + 1));
+    size_type new_capacity = static_cast<size_type>(std::floor(pow(2, std::floor(std::log2(n)) + 1)));
     elements_ = new T[new_capacity];
     capacity_ = new_capacity;
     std::copy(old, old + size_, elements_);
@@ -287,30 +287,27 @@ void vector<T>::assign(std::initializer_list<T> l) {
 
 template <class T>
 void vector<T>::resize(size_type sz) {
-    if (sz <= size_) {
-        size_ = sz;
-    }
-    else if (sz <= capacity_) {
-        std::fill(elements_ + size_, elements_ + sz, T());
-        size_ = sz;
+    if (sz <= capacity_) {
+        std::fill(begin() + sz, end(), T());
     }
     else {
         allocate_more(sz);
     }
+    size_ = sz;
 }
 
 template <class T>
 void vector<T>::resize(size_type sz, const T& c) {
-    if (sz <= size_) {
-        size_ = sz;
-    }
-    else if (sz <= capacity_) {
-        std::fill(elements_ + size_, elements_ + sz, c);
-        size_ = sz;
+    if (sz <= capacity_) {
+        std::fill(begin() + sz, end(), T());
     }
     else {
         allocate_more(sz);
     }
+    if (sz > size_) {
+        std::fill(elements_ + size_, elements_ + sz, T(c));
+    }
+    size_ = sz;
 }
 
 template <class T>
@@ -357,7 +354,7 @@ typename vector<T>::iterator vector<T>::insert(iterator position, const T& x) {
     if (size_ >= capacity_) {
         allocate_more(size_ + 1);
     }
-    std::move(begin() + p, end(), begin() + p + 1);
+    std::move_backward(begin() + p, end(), elements_ + size_ + 1);
     elements_[p] = T(x);
     ++size_;
     return begin() + p;
@@ -369,7 +366,7 @@ typename vector<T>::iterator vector<T>::insert(iterator position, T&& x) {
     if (size_ >= capacity_) {
         allocate_more(size_ + 1);
     }
-    std::move(begin() + p, end(), begin() + p + 1);
+    std::move_backward(begin() + p, end(), elements_ + size_ + 1);
     elements_[p] = T(x);
     ++size_;
     return begin() + p;
@@ -381,8 +378,8 @@ typename vector<T>::iterator vector<T>::insert(iterator position, size_type n, c
     if (size_ + n > capacity_) {
         allocate_more(size_ + n);
     }
-    std::move(begin() + p, end(), begin() + p + n);
-    std::fill(begin() + p, begin() + p + n, T(x));
+    std::move_backward(begin() + p, end(), elements_ + size_ + n);
+    std::fill(elements_ + p, elements_ + p + n, T(x));
     size_ += n;
     return begin() + p;
 }
@@ -395,8 +392,8 @@ typename vector<T>::iterator vector<T>::insert(iterator position, ForwardIterato
     if (size_ + n > capacity_) {
         allocate_more(size_ + n);
     }
-    std::move(begin() + p, end(), begin() + p + n);
-    std::copy(first, last, begin() + p);
+    std::move_backward(begin() + p, end(), elements_ + size_ + n);
+    std::copy(first, last, elements_ + p);
     size_ += n;
     return begin() + p;
 }
@@ -408,8 +405,8 @@ typename vector<T>::iterator vector<T>::insert(iterator position, std::initializ
     if (size_ + n > capacity_) {
         allocate_more(size_ + n);
     }
-    std::move(begin() + p, end(), begin() + p + n);
-    std::copy(il.begin(), il.end(), begin() + p);
+    std::move_backward(begin() + p, end(), elements_ + size_ + n);
+    std::copy(il.begin(), il.end(), elements_ + p);
     size_ += n;
     return begin() + p;
 }
@@ -439,6 +436,7 @@ void vector<T>::swap(vector& other) noexcept {
 template <class T>
 void vector<T>::clear() noexcept {
     delete[] elements_;
+    elements_ = nullptr;
     size_ = 0;
     capacity_ = 0;
 }
