@@ -599,7 +599,7 @@ TEST_CASE("Memory management") {
             REQUIRE(destroy_counter == 6); //1 temp
         }
     }
-    SECTION("Insertion") {
+    SECTION("Insertion and other") {
         {
             destroy_counter = 0;
             vector<Destroyable> a(15);
@@ -638,6 +638,20 @@ TEST_CASE("Memory management") {
             vector<Destroyable> a(10);
             a.clear();
             REQUIRE(destroy_counter == 10);
+        }
+        {
+            destroy_counter = 0;
+            vector<Destroyable> a(15);
+            a.emplace_back(Destroyable());
+            a.emplace(a.begin() + 3, Destroyable());
+            REQUIRE(destroy_counter == 18);
+        }
+        {
+            destroy_counter = 0;
+            vector<Destroyable> a(15);
+            a.emplace_back(Destroyable());
+            a.emplace_back(Destroyable());
+            REQUIRE(destroy_counter == 18); //2 temp, 16 are copied
         }
     }
 }

@@ -444,7 +444,7 @@ typename vector<T, Allocator>::iterator vector<T, Allocator>::emplace(iterator p
     if (elements_ + p < elements_ + size_) {
         std::move_backward(elements_ + p, elements_ + size_, elements_ + size_ + 1);
     }
-    allocator_.construct(elements_ + p, std::forward<Args>(args));
+    allocator_.construct(elements_ + p, std::forward<Args>(args)...);
     ++size_;
     return begin() + p;
 }
@@ -455,7 +455,7 @@ void vector<T, Allocator>::emplace_back(Args&&... args) {
     if (size_ + 1 > capacity_) {
         allocate(size_ + 1);
     }
-    allocator_.construct(elements_ + (size_++), std::forward<Args>(args));
+    allocator_.construct(elements_ + (size_++), std::forward<Args>(args)...);
 }
 
 template <class T, class Allocator>
