@@ -619,8 +619,15 @@ TEST_CASE("Memory management") {
             destroy_counter = 0;
             vector<Destroyable> a(15);
             a.push_back(Destroyable());
-            a.insert(a.end(), Destroyable());
+            a.insert(a.begin() + 3, Destroyable());
             REQUIRE(destroy_counter == 18);
+        }
+        {
+            destroy_counter = 0;
+            vector<Destroyable> a(15);
+            a.push_back(Destroyable());
+            a.insert(a.begin() + 3, { Destroyable(), Destroyable() });
+            REQUIRE(destroy_counter == 21);
         }
     }
 }

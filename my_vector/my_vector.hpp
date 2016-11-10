@@ -49,7 +49,6 @@ public:
         reference operator[](size_type n) const { return *(pos_ + n); };
 
         pointer pos_;
-
     private:
         vector<T, Allocator>* container_;
 
@@ -72,7 +71,6 @@ public:
     vector& operator=(vector&& x) noexcept;
     vector& operator=(std::initializer_list<T>);
 
-    //TODO: assign must be rewritten not to allocate more memory
     template <class ForwardIterator> void assign(ForwardIterator first, ForwardIterator last);
     void assign(size_type n, const T& u);
     void assign(std::initializer_list<T>);
@@ -81,7 +79,7 @@ public:
     iterator end() noexcept { return iterator(this, nullptr); }
 
     size_type size() const noexcept { return size_; }
-    size_type max_size() const noexcept { return std::numeric_limits<size_type>::max() / 4; }
+    size_type max_size() const noexcept { return allocator_.max_size(); }
     void resize(size_type sz);
     void resize(size_type sz, const T& c);
     size_type capacity() const noexcept { return capacity_; }
@@ -136,7 +134,7 @@ void vector<T, Allocator>::allocate(size_type n) {
     for (auto i = elements_; i < elements_ + size_; ++i) {
         allocator_.destroy(i);
     }
-    allocator_.deallocate(elements_, size_);
+    allocator_.deallocate(elements_, capacity_);
     capacity_ = new_capacity;
     elements_ = new_elements;
 }
@@ -216,7 +214,7 @@ vector<T, Allocator>::~vector() {
     for (auto i = elements_; i < elements_ + size_; ++i) {
         allocator_.destroy(i);
     }
-    allocator_.deallocate(elements_, size_);
+    allocator_.deallocate(elements_, capacity_);
 }
 
 template <class T, class Allocator>
@@ -451,6 +449,7 @@ void vector<T, Allocator>::clear() noexcept {
     for (auto i = elements_; i < elements_ + size_; ++i) {
         allocator_.destroy(i);
     }
+    allocator_.deallocate(elements_, capacity_);
     elements_ = nullptr;
     size_ = 0;
     capacity_ = 0;
