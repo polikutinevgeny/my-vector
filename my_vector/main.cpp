@@ -1,7 +1,24 @@
 #include "my_vector.hpp"
 #include <vector>
-#define CATCH_CONFIG_MAIN
+#define CATCH_CONFIG_RUNNER
 #include "catch.hpp"
+
+int destroy_counter;
+
+class Destroyable {
+public:
+    ~Destroyable() {
+        ++destroy_counter;
+    }
+};
+
+int main(int argc, char* const argv[]) {
+    int flag = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
+    flag |= _CRTDBG_LEAK_CHECK_DF;
+    _CrtSetDbgFlag(flag);
+    int result = Catch::Session().run(argc, argv);
+    return result;
+}
 
 using namespace my;
 
@@ -521,4 +538,89 @@ TEST_CASE("Misc") {
     REQUIRE(test.size() == 0);
     REQUIRE(test.capacity() == 0);
     CHECK_THROWS_AS(test.reserve(test.max_size()), std::bad_alloc);
+}
+
+TEST_CASE("Memory management") {
+    {
+        destroy_counter = 0;
+        vector<Destroyable> a(10);
+    }
+    REQUIRE(destroy_counter == 10);
+    
+    SECTION("Assignment") {
+        {
+            destroy_counter = 0;
+            vector<Destroyable> a(10);
+            a.assign(5, Destroyable());
+            REQUIRE(destroy_counter == 11); // 10 for elements, 1 for temp
+        }
+        {
+            destroy_counter = 0;
+            vector<Destroyable> a(10);
+            a.assign({Destroyable()});
+            REQUIRE(destroy_counter == 12); // 10 for elements, 1 for temp, 1 created during initializer list construction?
+        }
+        {
+            destroy_counter = 0;
+            vector<Destroyable> a(10);
+            vector<Destroyable> b(5);
+            a.assign(b.begin(), b.end());
+            REQUIRE(destroy_counter == 10);
+        }
+        {
+            destroy_counter = 0;
+            vector<Destroyable> a(10);
+            vector<Destroyable> b(5);
+            a = b;
+            REQUIRE(destroy_counter == 10);
+        }
+        {
+            destroy_counter = 0;
+            vector<Destroyable> a(10);
+            a = vector<Destroyable>(5);
+            REQUIRE(destroy_counter == 10);
+        }
+        {
+            destroy_counter = 0;
+            vector<Destroyable> a(10);
+            a = {Destroyable()};
+            REQUIRE(destroy_counter == 12); //two for init list
+        }
+    }
+    SECTION("Resize") {
+        {
+            destroy_counter = 0;
+            vector<Destroyable> a(10);
+            a.resize(50);
+            REQUIRE(destroy_counter == 11); //one temp in fill
+        }
+        {
+            destroy_counter = 0;
+            vector<Destroyable> a(10);
+            a.resize(5);
+            REQUIRE(destroy_counter == 5);
+        }
+        {
+            destroy_counter = 0;
+            vector<Destroyable> a(10);
+            a.resize(5, Destroyable());
+            REQUIRE(destroy_counter == 6); //1 temp
+        }
+    }
+    SECTION("Insertion") {
+        {
+            destroy_counter = 0;
+            vector<Destroyable> a(15);
+            a.push_back(Destroyable());
+            a.push_back(Destroyable());
+            REQUIRE(destroy_counter == 18); //2 temp, 16 are copied
+        }
+        {
+            destroy_counter = 0;
+            vector<Destroyable> a(15);
+            a.push_back(Destroyable());
+            a.insert(a.end(), Destroyable());
+            REQUIRE(destroy_counter == 18);
+        }
+    }
 }

@@ -3,11 +3,11 @@
 #include <stdexcept>
 #include <iterator>
 #include <limits>
-#include <algorithm>
+#include <xmemory>
 
 namespace my {
 
-template <class T> class vector { //TODO: use allocator to allocate memory not initializing it, use iterators
+template <class T, class Allocator = std::allocator<T>> class vector {
 public:
     typedef T value_type;
     typedef value_type& reference;
@@ -15,6 +15,7 @@ public:
     typedef ptrdiff_t difference_type;
     typedef size_t size_type;
     typedef T* pointer;
+    typedef Allocator allocator_type;
 
     class iterator : public std::iterator<
         std::random_access_iterator_tag, T, ptrdiff_t, T*, T&>
@@ -22,7 +23,7 @@ public:
     public:
         iterator() : pos_(nullptr), container_(nullptr) {};
         iterator(const iterator& other) : pos_(other.pos_), container_(other.container_) {};
-        iterator(vector<T>* container, pointer pos) : pos_(pos), container_(container) {}
+        iterator(vector<T, Allocator>* container, pointer pos) : pos_(pos), container_(container) {}
 
         iterator& operator= (const iterator&);
         bool operator== (const iterator& other) { return real_pos() == other.real_pos(); };
@@ -47,26 +48,19 @@ public:
         pointer operator->() const { return pos_; };
         reference operator[](size_type n) const { return *(pos_ + n); };
 
-    private:
         pointer pos_;
-        vector<T>* container_;
+
+    private:
+        vector<T, Allocator>* container_;
 
         void add(size_type);
         void substract(size_type);
         pointer real_pos() const { return pos_ != nullptr ? pos_ : container_->elements_ + container_->size_; }
     };
 
-    vector() : elements_(nullptr), size_(0), capacity_(0) {};
+    vector() : elements_(nullptr), size_(0), capacity_(0), allocator_() {};
     vector(size_type n);
     vector(size_type n, const T& value);
-    //TODO: get into template constructors
-    //template <class ForwardIterator, typename std::enable_if<
-    //    std::is_convertible<typename std::iterator_traits<ForwardIterator>::iterator_category,
-    //    std::forward_iterator_tag>::value, bool>::type>
-    //    vector(ForwardIterator first, ForwardIterator last);
-    //template <class ForwardIterator, typename std::enable_if<
-    //    std::is_base_of<std::forward_iterator_tag, typename std::iterator_traits<ForwardIterator>::iterator_category>::value>::type>
-    //    vector(ForwardIterator first, ForwardIterator last);
     template <class ForwardIterator>
         vector(ForwardIterator first, ForwardIterator last);
     vector(const vector& x);
@@ -92,8 +86,8 @@ public:
     void resize(size_type sz, const T& c);
     size_type capacity() const noexcept { return capacity_; }
     bool empty() const noexcept { return size_ == 0; }
-    void reserve(size_type n) { if (n > capacity_) allocate_more(n); }
-    void shrink_to_fit() { allocate_more(size_); }
+    void reserve(size_type n) { if (n > capacity_) allocate(n); }
+    void shrink_to_fit() { allocate(size_); }
 
     reference operator[](size_type n) { return elements_[n]; }
     const_reference operator[](size_type n) const { return elements_[n]; }
@@ -117,44 +111,46 @@ public:
     iterator erase(iterator position);
     iterator erase(iterator first, iterator last);
 
+    //template<class... Args> iterator emplace(iterator pos, Args&&... args);
+    //template<class... Args> void emplace_back(Args&&... args);
+
     void swap(vector&) noexcept;
     void clear() noexcept;
+    allocator_type get_allocator() const;
 private:
     pointer elements_;
     size_type size_;
     size_type capacity_;
+    allocator_type allocator_;
 
     void allocate(size_type n);
-    void allocate_more(size_type n);
 };
 
-template<class T> 
-void vector<T>::allocate(size_type n) {
+template <class T, class Allocator>
+void vector<T, Allocator>::allocate(size_type n) {
     size_type new_capacity = static_cast<size_type>(std::floor(pow(2, std::floor(std::log2(n)) + 1)));
-    elements_ = new T[new_capacity];
-    capacity_ = new_capacity;
-}
-
-template<class T>
-void vector<T>::allocate_more(size_type n) {
-    size_type new_capacity = static_cast<size_type>(std::floor(pow(2, std::floor(std::log2(n)) + 1)));
-    T* new_elements = new T[new_capacity];
-    std::copy(elements_, elements_ + size_, new_elements);
-    delete[] elements_;
+    T* new_elements = allocator_.allocate(new_capacity);
+    if (elements_ != nullptr && n > size_) {
+        std::uninitialized_copy(elements_, elements_ + size_, new_elements);
+    }
+    for (auto i = elements_; i < elements_ + size_; ++i) {
+        allocator_.destroy(i);
+    }
+    allocator_.deallocate(elements_, size_);
     capacity_ = new_capacity;
     elements_ = new_elements;
 }
 
-template <class T>
-typename vector<T>::iterator& vector<T>::iterator::operator=(const iterator& other) {
+template <class T, class Allocator>
+typename vector<T, Allocator>::iterator& vector<T, Allocator>::iterator::operator=(const iterator& other) {
     auto tmp(other);
     std::swap(pos_, tmp.pos_);
     std::swap(container_, tmp.container_);
     return *this;
 }
 
-template <class T>
-void vector<T>::iterator::add(size_type n) {
+template <class T, class Allocator>
+void vector<T, Allocator>::iterator::add(size_type n) {
     if (pos_ == nullptr) {
         return;
     }
@@ -164,8 +160,8 @@ void vector<T>::iterator::add(size_type n) {
     }
 }
 
-template <class T>
-void vector<T>::iterator::substract(size_type n) {
+template <class T, class Allocator>
+void vector<T, Allocator>::iterator::substract(size_type n) {
     if (pos_ == nullptr && n > 0) {
         pos_ = container_->elements_ + container_->size_;
     }
@@ -175,268 +171,293 @@ void vector<T>::iterator::substract(size_type n) {
     }
 }
 
-template <class T>
-vector<T>::vector(size_type n): size_(n) {
+template <class T, class Allocator>
+vector<T, Allocator>::vector(size_type n): elements_(nullptr), size_(0), capacity_(0), allocator_() {
     allocate(n);
+    size_ = n;
 }
 
-template <class T>
-vector<T>::vector(size_type n, const T& value): size_(n) {
+template <class T, class Allocator>
+vector<T, Allocator>::vector(size_type n, const T& value): elements_(nullptr), size_(0), capacity_(0), allocator_() {
     allocate(n);
-    std::fill(elements_, elements_ + size_, value);
+    std::uninitialized_fill(elements_, elements_ + n, value);
+    size_ = n;
 }
 
-template <class T>
+template <class T, class Allocator>
 template <class ForwardIterator>
-vector<T>::vector(ForwardIterator first, ForwardIterator last) : size_(std::distance(first, last)) {
-    allocate(size_);
-    std::copy(first, last, elements_);
+vector<T, Allocator>::vector(ForwardIterator first, ForwardIterator last) : elements_(nullptr), size_(0), capacity_(0), allocator_() {
+    allocate(std::distance(first, last));
+    std::uninitialized_copy(first, last, elements_);
+    size_ = std::distance(first, last);
 }
 
-//template <class T>
-//template <class ForwardIterator, typename std::enable_if<
-//    std::is_convertible<typename std::iterator_traits<ForwardIterator>::iterator_category,
-//    std::forward_iterator_tag>::value, bool>::type>
-//vector<T>::vector(ForwardIterator first, ForwardIterator last): size_(std::distance(first, last)) {
-//    allocate(size_);
-//    std::copy(first, last, elements_);
-//}
-
-//template <class T>
-//template <class ForwardIterator, typename std::enable_if<
-//    std::is_base_of<std::forward_iterator_tag, typename std::iterator_traits<ForwardIterator>::iterator_category>::value>::type>
-//vector<T>::vector(ForwardIterator first, ForwardIterator last) : size_(std::distance(first, last)) {
-//    allocate(size_);
-//    std::copy(first, last, elements_);
-//}
-
-template <class T>
-vector<T>::vector(const vector& x) : size_(x.size_) {
+template <class T, class Allocator>
+vector<T, Allocator>::vector(const vector& x) : elements_(nullptr), size_(0), capacity_(0), allocator_() {
     allocate(x.capacity_);
-    std::copy(x.elements_, x.elements_ + x.size_, elements_);
+    std::uninitialized_copy(x.elements_, x.elements_ + x.size_, elements_);
+    size_ = x.size_;
 }
 
-template <class T>
-vector<T>::vector(vector&& x) noexcept : elements_(nullptr), size_(0), capacity_(0) {
+template <class T, class Allocator>
+vector<T, Allocator>::vector(vector&& x) noexcept : elements_(nullptr), size_(0), capacity_(0), allocator_() {
     swap(x);
 }
 
-template <class T>
-vector<T>::vector(std::initializer_list<T> l) : size_(l.size()) {
-    allocate(size_);
-    std::copy(l.begin(), l.end(), elements_);
+template <class T, class Allocator>
+vector<T, Allocator>::vector(std::initializer_list<T> l) : elements_(nullptr), size_(0), capacity_(0), allocator_() {
+    allocate(l.size());
+    std::uninitialized_copy(l.begin(), l.end(), elements_);
+    size_ = l.size();
 }
 
-template <class T>
-vector<T>::~vector() {
-    delete[] elements_;
+template <class T, class Allocator>
+vector<T, Allocator>::~vector() {
+    for (auto i = elements_; i < elements_ + size_; ++i) {
+        allocator_.destroy(i);
+    }
+    allocator_.deallocate(elements_, size_);
 }
 
-template <class T>
-vector<T>& vector<T>::operator=(const vector& x) {
-    vector<T> tmp(x);
+template <class T, class Allocator>
+vector<T, Allocator>& vector<T, Allocator>::operator=(const vector& x) {
+    vector<T, Allocator> tmp(x);
     swap(tmp);
     return *this;
 }
 
-template <class T>
-vector<T>& vector<T>::operator=(vector&& x) noexcept {
+template <class T, class Allocator>
+vector<T, Allocator>& vector<T, Allocator>::operator=(vector&& x) noexcept {
     swap(x);
     return *this;
 }
 
-template <class T>
-vector<T>& vector<T>::operator=(std::initializer_list<T> l) {
+template <class T, class Allocator>
+vector<T, Allocator>& vector<T, Allocator>::operator=(std::initializer_list<T> l) {
+    for (auto i = elements_; i < elements_ + size_; ++i) {
+        allocator_.destroy(i);
+    }
+    size_ = 0;
+    if (l.size() > capacity_) {
+        allocate(l.size());
+    }
+    std::uninitialized_copy(std::make_move_iterator(l.begin()), std::make_move_iterator(l.end()), elements_);
     size_ = l.size();
-    allocate(size_);
-    std::move(l.begin(), l.end(), elements_);
     return *this;
 }
 
-template <class T>
+template <class T, class Allocator>
 template <class ForwardIterator>
-void vector<T>::assign(ForwardIterator first, ForwardIterator last) {
+void vector<T, Allocator>::assign(ForwardIterator first, ForwardIterator last) {
+    for (auto i = elements_; i < elements_ + size_; ++i) {
+        allocator_.destroy(i);
+    }
+    size_ = 0;
     size_type new_size = std::distance(first, last);
-    pointer old_elements = elements_;
-    allocate(new_size);
-    std::copy(first, last, elements_);
+    if (new_size > capacity_) {
+        allocate(new_size);
+    }
+    std::uninitialized_copy(first, last, elements_);
     size_ = new_size;
-    delete[] old_elements;
 }
 
-template <class T>
-void vector<T>::assign(size_type n, const T& u) {
-    pointer old_elements = elements_;
-    allocate(n);
-    std::fill(elements_, elements_ + n, u);
+template <class T, class Allocator>
+void vector<T, Allocator>::assign(size_type n, const T& u) {
+    for (auto i = elements_; i < elements_ + size_; ++i) {
+        allocator_.destroy(i);
+    }
+    size_ = 0;
+    if (n > capacity_) {
+        allocate(n);
+    }
+    std::uninitialized_fill(elements_, elements_ + n, u);
     size_ = n;
-    delete[] old_elements;
 }
 
-template <class T>
-void vector<T>::assign(std::initializer_list<T> l) {
+template <class T, class Allocator>
+void vector<T, Allocator>::assign(std::initializer_list<T> l) {
+    for (auto i = elements_; i < elements_ + size_; ++i) {
+        allocator_.destroy(i);
+    }
+    size_ = 0;
     size_type new_size = l.size();
-    pointer old_elements = elements_;
-    allocate(new_size);
-    std::copy(l.begin(), l.end(), elements_);
+    if (new_size > capacity_) {
+        allocate(new_size);
+    }
+    std::uninitialized_copy(l.begin(), l.end(), elements_);
     size_ = new_size;
-    delete[] old_elements;
 }
 
-template <class T>
-void vector<T>::resize(size_type sz) {
-    if (sz <= capacity_) {
-        std::fill(begin() + sz, end(), T());
+template <class T, class Allocator>
+void vector<T, Allocator>::resize(size_type sz) {
+    if (sz <= size_) {
+        for (auto i = elements_ + sz; i < elements_ + size_; ++i) {
+            allocator_.destroy(i);
+        }
     }
     else {
-        allocate_more(sz);
+        if (sz > capacity_) {
+            allocate(sz);
+        }
+        std::uninitialized_fill(elements_ + size_, elements_ + sz, T());
     }
     size_ = sz;
 }
 
-template <class T>
-void vector<T>::resize(size_type sz, const T& c) {
-    if (sz <= capacity_) {
-        std::fill(begin() + sz, end(), T());
+template <class T, class Allocator>
+void vector<T, Allocator>::resize(size_type sz, const T& c) {
+    if (sz <= size_) {
+        for (auto i = elements_ + sz; i < elements_ + size_; ++i) {
+            allocator_.destroy(i);
+        }
     }
     else {
-        allocate_more(sz);
-    }
-    if (sz > size_) {
-        std::fill(elements_ + size_, elements_ + sz, T(c));
+        if (sz > capacity_) {
+            allocate(sz);
+        }
+        std::uninitialized_fill(elements_ + size_, elements_ + sz, c);
     }
     size_ = sz;
 }
 
-template <class T>
-typename vector<T>::const_reference vector<T>::at(size_type n) const {
+template <class T, class Allocator>
+typename vector<T, Allocator>::const_reference vector<T, Allocator>::at(size_type n) const {
     if (n >= size_) {
         throw std::out_of_range("Vector subscript out of range");
     }
     return elements_[n];
 }
 
-template <class T>
-typename vector<T>::reference vector<T>::at(size_type n) {
+template <class T, class Allocator>
+typename vector<T, Allocator>::reference vector<T, Allocator>::at(size_type n) {
     if (n >= size_) {
         throw std::out_of_range("Vector subscript out of range");
     }
     return elements_[n];
 }
 
-template <class T>
-void vector<T>::push_back(const T& x) {
-    if (size_ >= capacity_) {
-        allocate_more(size_ + 1);
+template <class T, class Allocator>
+void vector<T, Allocator>::push_back(const T& x) {
+    if (size_ + 1 > capacity_) {
+        allocate(size_ + 1);
     }
-    elements_[size_++] = T(x);
+    allocator_.construct(elements_ + (size_++), x);
 }
 
-template <class T>
-void vector<T>::push_back(T&& x) {
-    if (size_ >= capacity_) {
-        allocate_more(size_ + 1);
+template <class T, class Allocator>
+void vector<T, Allocator>::push_back(T&& x) {
+    if (size_ + 1 > capacity_) {
+        allocate(size_ + 1);
     }
-    elements_[size_++] = T(x);
+    allocator_.construct(elements_ + (size_++), x);
 }
 
-template <class T>
-void vector<T>::pop_back() {
-    size_ = std::max(size_ - 1, 0U);
-    elements_[size_] = T();
+template <class T, class Allocator>
+void vector<T, Allocator>::pop_back() {
+    allocator_.destroy(elements_ + (size_--));
 }
 
-template <class T>
-typename vector<T>::iterator vector<T>::insert(iterator position, const T& x) {
+template <class T, class Allocator>
+typename vector<T, Allocator>::iterator vector<T, Allocator>::insert(iterator position, const T& x) {
     difference_type p = position - begin();
-    if (size_ >= capacity_) {
-        allocate_more(size_ + 1);
+    if (size_ + 1 > capacity_) {
+        allocate(size_ + 1);
     }
-    std::move_backward(begin() + p, end(), elements_ + size_ + 1);
-    elements_[p] = T(x);
+    std::move_backward(elements_ + p, elements_ + size_, elements_ + size_ + 1);
+    allocator_.construct(elements_ + p, x);
     ++size_;
     return begin() + p;
 }
 
-template <class T>
-typename vector<T>::iterator vector<T>::insert(iterator position, T&& x) {
+template <class T, class Allocator>
+typename vector<T, Allocator>::iterator vector<T, Allocator>::insert(iterator position, T&& x) {
     difference_type p = position - begin();
-    if (size_ >= capacity_) {
-        allocate_more(size_ + 1);
+    if (size_ + 1 > capacity_) {
+        allocate(size_ + 1);
     }
-    std::move_backward(begin() + p, end(), elements_ + size_ + 1);
-    elements_[p] = T(x);
+    std::move_backward(elements_ + p, elements_ + size_, elements_ + size_ + 1);
+    allocator_.construct(elements_ + p, x);
     ++size_;
     return begin() + p;
 }
 
-template <class T>
-typename vector<T>::iterator vector<T>::insert(iterator position, size_type n, const T& x) {
+template <class T, class Allocator>
+typename vector<T, Allocator>::iterator vector<T, Allocator>::insert(iterator position, size_type n, const T& x) {
     difference_type p = position - begin();
     if (size_ + n > capacity_) {
-        allocate_more(size_ + n);
+        allocate(size_ + n);
     }
-    std::move_backward(begin() + p, end(), elements_ + size_ + n);
-    std::fill(elements_ + p, elements_ + p + n, T(x));
+    std::move_backward(elements_ + p, elements_ + size_, elements_ + size_ + n);
+    std::uninitialized_fill(elements_ + p, elements_ + p + n, x);
     size_ += n;
     return begin() + p;
 }
 
-template <class T>
+template <class T, class Allocator>
 template <class ForwardIterator>
-typename vector<T>::iterator vector<T>::insert(iterator position, ForwardIterator first, ForwardIterator last) {
+typename vector<T, Allocator>::iterator vector<T, Allocator>::insert(iterator position, ForwardIterator first, ForwardIterator last) {
     size_type n = std::distance(first, last);
     difference_type p = position - begin();
     if (size_ + n > capacity_) {
-        allocate_more(size_ + n);
+        allocate(size_ + n);
     }
-    std::move_backward(begin() + p, end(), elements_ + size_ + n);
-    std::copy(first, last, elements_ + p);
+    std::move_backward(elements_ + p, elements_ + size_, elements_ + size_ + n);
+    std::uninitialized_copy(first, last, elements_ + p);
     size_ += n;
     return begin() + p;
 }
 
-template <class T>
-typename vector<T>::iterator vector<T>::insert(iterator position, std::initializer_list<T> il) {
+template <class T, class Allocator>
+typename vector<T, Allocator>::iterator vector<T, Allocator>::insert(iterator position, std::initializer_list<T> il) {
     size_type n = il.size();
     difference_type p = position - begin();
     if (size_ + n > capacity_) {
-        allocate_more(size_ + n);
+        allocate(size_ + n);
     }
-    std::move_backward(begin() + p, end(), elements_ + size_ + n);
-    std::copy(il.begin(), il.end(), elements_ + p);
+    std::move_backward(elements_ + p, elements_ + size_, elements_ + size_ + n);
+    std::uninitialized_copy(il.begin(), il.end(), elements_ + p);
     size_ += n;
     return begin() + p;
 }
 
-template <class T>
-typename vector<T>::iterator vector<T>::erase(iterator position) {
+template <class T, class Allocator>
+typename vector<T, Allocator>::iterator vector<T, Allocator>::erase(iterator position) {
+    allocator_.destroy(position.pos_);
     std::move(position + 1, end(), position);
     --size_;
     return position;
 }
 
-template <class T>
-typename vector<T>::iterator vector<T>::erase(iterator first, iterator last) {
+template <class T, class Allocator>
+typename vector<T, Allocator>::iterator vector<T, Allocator>::erase(iterator first, iterator last) {
+    for (auto i = first.pos_; i != last.pos_; ++i) {
+        allocator_.destroy(i);
+    }
     auto d = last - first;
     std::move(last, end(), first);
     size_ -= d;
-    return last != end() ? first : end();
+    return first;
 }
 
-template<class T>
-void vector<T>::swap(vector& other) noexcept {
+template <class T, class Allocator>
+void vector<T, Allocator>::swap(vector& other) noexcept {
     std::swap(elements_, other.elements_);
     std::swap(capacity_, other.capacity_);
     std::swap(size_, other.size_);
 }
 
-template <class T>
-void vector<T>::clear() noexcept {
-    delete[] elements_;
+template <class T, class Allocator>
+void vector<T, Allocator>::clear() noexcept {
+    for (auto i = elements_; i < elements_ + size_; ++i) {
+        allocator_.destroy(i);
+    }
     elements_ = nullptr;
     size_ = 0;
     capacity_ = 0;
 }
 
+template <class T, class Allocator>
+typename vector<T, Allocator>::allocator_type vector<T, Allocator>::get_allocator() const {
+    return allocator_;
+}
 }
