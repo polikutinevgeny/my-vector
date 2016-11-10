@@ -53,7 +53,7 @@ TEST_CASE ("Constructors' tests", "[constructors]") {
         }
         REQUIRE(ok);
 
-        vector<int> temp2(10U, 673);
+        std::vector<int> temp2(10U, 673);
         vector<int> test2(temp2.begin(), temp2.end());
         REQUIRE(test2.size() == 10);
         REQUIRE(test2.capacity() >= 10);
@@ -228,16 +228,8 @@ TEST_CASE("Iterators") {
         REQUIRE(*it == 3);
         it += 2;
         REQUIRE(*it == 5);
-        it -= 10;
-        REQUIRE(*it == 0);
-        it += 10;
-        REQUIRE(it == test.end());
-        REQUIRE(*--it == 5);
-        REQUIRE(++it == test.end());
         it = 3 + test.begin();
         REQUIRE(*it == 3);
-        it = test.end();
-        REQUIRE(++it == test.end());
     }
     SECTION("Empty vector") {
         vector<int> test;
@@ -629,5 +621,27 @@ TEST_CASE("Memory management") {
             a.insert(a.begin() + 3, { Destroyable(), Destroyable() });
             REQUIRE(destroy_counter == 21);
         }
+        {
+            destroy_counter = 0;
+            vector<Destroyable> a(10);
+            a.erase(a.begin());
+            REQUIRE(destroy_counter == 1);
+        }
+        {
+            destroy_counter = 0;
+            vector<Destroyable> a(10);
+            a.erase(a.begin(), a.begin() + 3);
+            REQUIRE(destroy_counter == 3);
+        }
+        {
+            destroy_counter = 0;
+            vector<Destroyable> a(10);
+            a.clear();
+            REQUIRE(destroy_counter == 10);
+        }
     }
+}
+
+TEST_CASE("Emplace") {
+    
 }

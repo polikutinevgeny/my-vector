@@ -26,12 +26,12 @@ public:
         iterator(vector<T, Allocator>* container, pointer pos) : pos_(pos), container_(container) {}
 
         iterator& operator= (const iterator&);
-        bool operator== (const iterator& other) { return real_pos() == other.real_pos(); };
-        bool operator!= (const iterator& other) { return real_pos() != other.real_pos(); };
-        bool operator> (const iterator& other) { return real_pos() > other.real_pos(); };
-        bool operator< (const iterator& other) { return real_pos() < other.real_pos(); };
-        bool operator>= (const iterator& other) { return real_pos() >= other.real_pos(); };
-        bool operator<= (const iterator& other) { return real_pos() <= other.real_pos(); };
+        bool operator== (const iterator& other) { return pos_ == other.pos_; };
+        bool operator!= (const iterator& other) { return pos_ != other.pos_; };
+        bool operator> (const iterator& other) { return pos_ > other.pos_; };
+        bool operator< (const iterator& other) { return pos_ < other.pos_; };
+        bool operator>= (const iterator& other) { return pos_ >= other.pos_; };
+        bool operator<= (const iterator& other) { return pos_ <= other.pos_; };
 
         iterator& operator++() { add(1); return *this; };
         iterator operator++(int) { iterator it(*this); add(1); return it; };
@@ -42,7 +42,7 @@ public:
         friend iterator operator+(size_type n, const iterator& that) { iterator it(that); it.add(n); return it; };
         iterator& operator-=(size_type n) { substract(n); return *this; };
         iterator operator-(size_type n) const { iterator it(*this); it.substract(n); return it; };
-        difference_type operator-(iterator other) const { return real_pos() - other.real_pos(); }
+        difference_type operator-(iterator other) const { return pos_ - other.pos_; }
 
         reference operator*() const { return *pos_; };
         pointer operator->() const { return pos_; };
@@ -54,7 +54,6 @@ public:
 
         void add(size_type);
         void substract(size_type);
-        pointer real_pos() const { return pos_ != nullptr ? pos_ : container_->elements_ + container_->size_; }
     };
 
     vector() : elements_(nullptr), size_(0), capacity_(0), allocator_() {};
@@ -75,8 +74,8 @@ public:
     void assign(size_type n, const T& u);
     void assign(std::initializer_list<T>);
 
-    iterator begin() noexcept { return iterator(this, size_ > 0 ? elements_ : nullptr); }
-    iterator end() noexcept { return iterator(this, nullptr); }
+    iterator begin() noexcept { return iterator(this, elements_); }
+    iterator end() noexcept { return iterator(this, elements_ + size_); }
 
     size_type size() const noexcept { return size_; }
     size_type max_size() const noexcept { return allocator_.max_size(); }
@@ -109,8 +108,8 @@ public:
     iterator erase(iterator position);
     iterator erase(iterator first, iterator last);
 
-    //template<class... Args> iterator emplace(iterator pos, Args&&... args);
-    //template<class... Args> void emplace_back(Args&&... args);
+    template<class... Args> iterator emplace(iterator pos, Args&&... args);
+    template<class... Args> void emplace_back(Args&&... args);
 
     void swap(vector&) noexcept;
     void clear() noexcept;
@@ -149,24 +148,12 @@ typename vector<T, Allocator>::iterator& vector<T, Allocator>::iterator::operato
 
 template <class T, class Allocator>
 void vector<T, Allocator>::iterator::add(size_type n) {
-    if (pos_ == nullptr) {
-        return;
-    }
     pos_ += n;
-    if (pos_ >= container_->elements_ + container_->size_) {
-        pos_ = nullptr;
-    }
 }
 
 template <class T, class Allocator>
 void vector<T, Allocator>::iterator::substract(size_type n) {
-    if (pos_ == nullptr && n > 0) {
-        pos_ = container_->elements_ + container_->size_;
-    }
     pos_ -= n;
-    if (pos_ < container_->elements_) {
-        pos_ = container_->elements_;
-    }
 }
 
 template <class T, class Allocator>
@@ -361,7 +348,9 @@ typename vector<T, Allocator>::iterator vector<T, Allocator>::insert(iterator po
     if (size_ + 1 > capacity_) {
         allocate(size_ + 1);
     }
-    std::move_backward(elements_ + p, elements_ + size_, elements_ + size_ + 1);
+    if (elements_ + p < elements_ + size_) {
+        std::move_backward(elements_ + p, elements_ + size_, elements_ + size_ + 1);
+    }
     allocator_.construct(elements_ + p, x);
     ++size_;
     return begin() + p;
@@ -373,7 +362,9 @@ typename vector<T, Allocator>::iterator vector<T, Allocator>::insert(iterator po
     if (size_ + 1 > capacity_) {
         allocate(size_ + 1);
     }
-    std::move_backward(elements_ + p, elements_ + size_, elements_ + size_ + 1);
+    if (elements_ + p < elements_ + size_) {
+        std::move_backward(elements_ + p, elements_ + size_, elements_ + size_ + 1);
+    }
     allocator_.construct(elements_ + p, x);
     ++size_;
     return begin() + p;
@@ -385,7 +376,9 @@ typename vector<T, Allocator>::iterator vector<T, Allocator>::insert(iterator po
     if (size_ + n > capacity_) {
         allocate(size_ + n);
     }
-    std::move_backward(elements_ + p, elements_ + size_, elements_ + size_ + n);
+    if (elements_ + p < elements_ + size_) {
+        std::move_backward(elements_ + p, elements_ + size_, elements_ + size_ + n);
+    }
     std::uninitialized_fill(elements_ + p, elements_ + p + n, x);
     size_ += n;
     return begin() + p;
@@ -399,7 +392,9 @@ typename vector<T, Allocator>::iterator vector<T, Allocator>::insert(iterator po
     if (size_ + n > capacity_) {
         allocate(size_ + n);
     }
-    std::move_backward(elements_ + p, elements_ + size_, elements_ + size_ + n);
+    if (elements_ + p < elements_ + size_ + 1) {
+        std::move_backward(elements_ + p, elements_ + size_, elements_ + size_ + n);
+    }
     std::uninitialized_copy(first, last, elements_ + p);
     size_ += n;
     return begin() + p;
@@ -412,7 +407,9 @@ typename vector<T, Allocator>::iterator vector<T, Allocator>::insert(iterator po
     if (size_ + n > capacity_) {
         allocate(size_ + n);
     }
-    std::move_backward(elements_ + p, elements_ + size_, elements_ + size_ + n);
+    if (elements_ + p < elements_ + size_) {
+        std::move_backward(elements_ + p, elements_ + size_, elements_ + size_ + n);
+    }
     std::uninitialized_copy(il.begin(), il.end(), elements_ + p);
     size_ += n;
     return begin() + p;
@@ -435,6 +432,30 @@ typename vector<T, Allocator>::iterator vector<T, Allocator>::erase(iterator fir
     std::move(last, end(), first);
     size_ -= d;
     return first;
+}
+
+template <class T, class Allocator>
+template <class ... Args>
+typename vector<T, Allocator>::iterator vector<T, Allocator>::emplace(iterator pos, Args&&... args) {
+    difference_type p = pos - begin();
+    if (size_ + 1 > capacity_) {
+        allocate(size_ + 1);
+    }
+    if (elements_ + p < elements_ + size_) {
+        std::move_backward(elements_ + p, elements_ + size_, elements_ + size_ + 1);
+    }
+    allocator_.construct(elements_ + p, std::forward<Args>(args));
+    ++size_;
+    return begin() + p;
+}
+
+template <class T, class Allocator>
+template <class ... Args>
+void vector<T, Allocator>::emplace_back(Args&&... args) {
+    if (size_ + 1 > capacity_) {
+        allocate(size_ + 1);
+    }
+    allocator_.construct(elements_ + (size_++), std::forward<Args>(args));
 }
 
 template <class T, class Allocator>
