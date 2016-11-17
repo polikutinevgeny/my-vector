@@ -14,7 +14,7 @@ class allocator;
 template<class T>
 struct memory_pool {
     memory_pool() {
-        max_size = 0xFFFF;
+        max_size = 0xFFFFF;
         pool = static_cast<typename allocator<T>::pointer>(::operator new(max_size * sizeof(T)));
         blocks = { typename allocator<T>::block(pool, max_size - 1, block_status::FREE) };
     };
@@ -39,15 +39,21 @@ public:
     typedef const T& const_reference;
     typedef size_t size_type;
     typedef ptrdiff_t difference_type;
-    struct rebind { typedef allocator<T> other; };
+
+    template<class U> struct rebind { typedef allocator<U> other; };
+
     allocator() noexcept { }
     allocator(const allocator<T>&) noexcept { }
-    static pointer allocate(size_type n);
-    static void deallocate(pointer p, size_type n);
-    template <class... Args> static void construct(pointer p, Args&&... args) {
+    template<class U> allocator(const allocator<U>&) noexcept {}
+
+    pointer allocate(size_type n);
+    void deallocate(pointer p, size_type n);
+
+    template <class... Args> void construct(pointer p, Args&&... args) {
         ::new (static_cast<void*>(p)) T(std::forward<Args>(args)...);
     };
-    static void destroy(pointer p) { p->~value_type(); };
+    void destroy(pointer p) { p->~value_type(); };
+
     size_type max_size() const noexcept { return pool<T>().max_size; }
 
     struct block {
@@ -112,5 +118,12 @@ void allocator<T>::deallocate(pointer p, size_type n) {
         }
     }
 }
+
+template <class T, class U>
+constexpr bool operator== (const allocator<T>&, const allocator<U>&) noexcept {return true;}
+
+template <class T, class U>
+constexpr bool operator!= (const allocator<T>&, const allocator<U>&) noexcept {return false;}
+
 
 }
