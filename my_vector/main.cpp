@@ -2,6 +2,7 @@
 #include <vector>
 #define CATCH_CONFIG_RUNNER
 #include "catch.hpp"
+#include "allocator.hpp"
 
 int destroy_counter;
 
@@ -9,6 +10,22 @@ class Destroyable {
 public:
     ~Destroyable() {
         ++destroy_counter;
+    }
+};
+
+int copy_counter;
+
+class Exceptional {
+public:
+    Exceptional() {}
+    Exceptional(const Exceptional& other) {
+        if (copy_counter >= 5) {
+            throw std::exception("Oops");
+        }
+        ++copy_counter;
+    }
+    ~Exceptional() {
+        
     }
 };
 
@@ -24,16 +41,16 @@ using namespace my;
 
 TEST_CASE ("Constructors' tests", "[constructors]") {
     SECTION("Default constructor") {
-        vector<int> test;
+        vector<int, allocator<int>> test;
         REQUIRE(test.empty());
     }
     SECTION("Amount constructor") {
-        vector<int> test(10);
+        vector<int, allocator<int>> test(10);
         REQUIRE(test.size() == 10);
         REQUIRE(test.capacity() >= 10);
     }
     SECTION("Amount constructor with default value") {
-        vector<int> test(10U, 673);
+        vector<int, allocator<int>> test(10U, 673);
         REQUIRE(test.size() == 10);
         REQUIRE(test.capacity() >= 10);
         bool ok = true;
@@ -44,7 +61,7 @@ TEST_CASE ("Constructors' tests", "[constructors]") {
     }
     SECTION("Iterator constructor") {
         std::vector<int> temp(10, 673);
-        vector<int> test(temp.begin(), temp.end());
+        vector<int, allocator<int>> test(temp.begin(), temp.end());
         REQUIRE(test.size() == 10);
         REQUIRE(test.capacity() >= 10);
         bool ok = true;
@@ -54,7 +71,7 @@ TEST_CASE ("Constructors' tests", "[constructors]") {
         REQUIRE(ok);
 
         std::vector<int> temp2(10U, 673);
-        vector<int> test2(temp2.begin(), temp2.end());
+        vector<int, allocator<int>> test2(temp2.begin(), temp2.end());
         REQUIRE(test2.size() == 10);
         REQUIRE(test2.capacity() >= 10);
         bool ok2 = true;
@@ -64,8 +81,8 @@ TEST_CASE ("Constructors' tests", "[constructors]") {
         REQUIRE(ok2);
     }
     SECTION("Copy constructor") {
-        vector<int> test(10U, 673);
-        vector<int> test2(test);
+        vector<int, allocator<int>> test(10U, 673);
+        vector<int, allocator<int>> test2(test);
         REQUIRE(test.size() == 10);
         REQUIRE(test.capacity() >= 10);
         REQUIRE(test2.size() == 10);
@@ -82,8 +99,8 @@ TEST_CASE ("Constructors' tests", "[constructors]") {
         REQUIRE(ok2);
     }
     SECTION("Move constructor") {
-        vector<int> test(10U, 673);
-        vector<int> test2(std::move(test));
+        vector<int, allocator<int>> test(10U, 673);
+        vector<int, allocator<int>> test2(std::move(test));
         REQUIRE(test.size() == 0);
         REQUIRE(test.capacity() == 0);
         REQUIRE(test2.size() == 10);
@@ -95,7 +112,7 @@ TEST_CASE ("Constructors' tests", "[constructors]") {
         REQUIRE(ok);
     }
     SECTION("Init list constructor") {
-        vector<int> test = { 0, 1, 2, 3, 4, 5 };
+        vector<int, allocator<int>> test = { 0, 1, 2, 3, 4, 5 };
         REQUIRE(test.size() == 6);
         REQUIRE(test.capacity() >= 6);
         bool ok = true;
@@ -108,8 +125,8 @@ TEST_CASE ("Constructors' tests", "[constructors]") {
 
 TEST_CASE ("Operators", "[operators]") {
     SECTION("Copy assignment") {
-        vector<int> test;
-        vector<int> test2 = { 0, 1, 2, 3, 4, 5 };
+        vector<int, allocator<int>> test;
+        vector<int, allocator<int>> test2 = { 0, 1, 2, 3, 4, 5 };
         test = test2;
         REQUIRE(test.size() == 6);
         REQUIRE(test.capacity() >= 6);
@@ -127,8 +144,8 @@ TEST_CASE ("Operators", "[operators]") {
         REQUIRE(ok);
     }
     SECTION("Move assignment") {
-        vector<int> test;
-        vector<int> test2 = { 0, 1, 2, 3, 4, 5 };
+        vector<int, allocator<int>> test;
+        vector<int, allocator<int>> test2 = { 0, 1, 2, 3, 4, 5 };
         test = std::move(test2);
         REQUIRE(test.size() == 6);
         REQUIRE(test.capacity() >= 6);
@@ -141,7 +158,7 @@ TEST_CASE ("Operators", "[operators]") {
         REQUIRE(ok);
     }
     SECTION("Init list assignment") {
-        vector<int> test;
+        vector<int, allocator<int>> test;
         test = { 0, 1, 2, 3, 4, 5 };
         REQUIRE(test.size() == 6);
         REQUIRE(test.capacity() >= 6);
@@ -155,8 +172,8 @@ TEST_CASE ("Operators", "[operators]") {
 
 TEST_CASE("Assigns") {
     SECTION("Iterator assign") {
-        vector<int> test = { 0, 1, 2, 3, 4, 5 };
-        vector<int> test2 = { 5, 6, 7 };
+        vector<int, allocator<int>> test = { 0 };
+        vector<int, allocator<int>> test2 = { 5, 6, 7 };
         test.assign(test2.begin(), test2.end());
         REQUIRE(test.size() == 3);
         REQUIRE(test.capacity() >= 3);
@@ -167,7 +184,7 @@ TEST_CASE("Assigns") {
         REQUIRE(ok);
     }
     SECTION("Filling assign") {
-        vector<int> test = { 0, 1, 2, 3, 4, 5 };
+        vector<int, allocator<int>> test = { 0, 1, 2, 3, 4, 5 };
         test.assign(10U, 573);
         REQUIRE(test.size() == 10);
         REQUIRE(test.capacity() >= 10);
@@ -178,7 +195,7 @@ TEST_CASE("Assigns") {
         REQUIRE(ok);
     }
     SECTION("Init list assign") {
-        vector<int> test = { 0, 1, 2, 3, 4, 5 };
+        vector<int, allocator<int>> test = { 0 };
         test.assign({ 5, 6, 7 });
         REQUIRE(test.size() == 3);
         REQUIRE(test.capacity() >= 3);
@@ -192,7 +209,7 @@ TEST_CASE("Assigns") {
 
 TEST_CASE("Iterators") {
     SECTION("Vector with elements") {
-        vector<int> test = { 0, 1, 2, 3, 4, 5 };
+        vector<int, allocator<int>> test = { 0, 1, 2, 3, 4, 5 };
         auto it = test.begin();
         REQUIRE(*it == 0);
         it = test.end() - 1;
@@ -232,20 +249,20 @@ TEST_CASE("Iterators") {
         REQUIRE(*it == 3);
     }
     SECTION("Empty vector") {
-        vector<int> test;
+        vector<int, allocator<int>> test;
         REQUIRE(test.begin() == test.end());
     }
     SECTION("Misc") {
-        vector<int>::iterator it;
+        vector<int, allocator<int>>::iterator it;
         REQUIRE(it.operator->() == nullptr);
-        vector<int> test = { 0, 1, 2, 3, 4, 5 };
+        vector<int, allocator<int>> test = { 0, 1, 2, 3, 4, 5 };
         REQUIRE(test.begin()[1] == 1);
     }
 }
 
 TEST_CASE("Size management") {
-    vector<int> test(10U, 13);
-    REQUIRE(test.max_size() == std::numeric_limits<vector<int>::size_type>::max() / 4);
+    vector<int, allocator<int>> test(10U, 13);
+    REQUIRE(test.max_size() == allocator<int>().max_size());
     REQUIRE(test.size() == 10);
     REQUIRE(test.capacity() >= 10);
     test.resize(15);
@@ -327,7 +344,7 @@ TEST_CASE("Size management") {
 
 TEST_CASE("Data access") {
     {
-        const vector<int> test = { 0,1,2,3,4,5 };
+        const vector<int, allocator<int>> test = { 0,1,2,3,4,5 };
         REQUIRE(test[1] == 1);
         REQUIRE(test.at(2) == 2);
         REQUIRE_THROWS_AS(test.at(6), std::out_of_range);
@@ -336,7 +353,7 @@ TEST_CASE("Data access") {
         REQUIRE(*test.data() == 0);
     }
     {
-        vector<int> test = { 0,1,2,3,4,5 };
+        vector<int, allocator<int>> test = { 0,1,2,3,4,5 };
         REQUIRE(test[1] == 1);
         REQUIRE(test.at(2) == 2);
         REQUIRE_THROWS_AS(test.at(6), std::out_of_range);
@@ -348,7 +365,7 @@ TEST_CASE("Data access") {
 
 TEST_CASE("Data management") {
     SECTION("Push-pop") {
-        vector<int> test = { 0,1,2,3,4,5 };
+        vector<int, allocator<int>> test = { 0,1,2,3,4,5 };
         test.push_back(6);
         REQUIRE(test.size() == 7);
         REQUIRE(test.capacity() >= 7);
@@ -399,7 +416,7 @@ TEST_CASE("Data management") {
         REQUIRE(test[0] == 8);
     }
     SECTION("Insert") {
-        vector<int> test = { 0,1,2,3,4,5 };
+        vector<int, allocator<int>> test = { 0,1,2,3,4,5 };
         test.insert(test.begin(), -1);
         int t = -2;
         test.insert(test.begin(), t);
@@ -416,19 +433,19 @@ TEST_CASE("Data management") {
         REQUIRE(test.size() == 11);
         REQUIRE(test.capacity() >= 11);
         {
-            vector<int> r = { -2,13,13,13,-1,0,1,2,3,4,5 };
+            vector<int, allocator<int>> r = { -2,13,13,13,-1,0,1,2,3,4,5 };
             bool ok = true;
             for (int i = 0; i < 11; ++i) {
                 ok = ok && test[i] == r[i];
             }
             REQUIRE(ok);
         }
-        vector<int> tt = { 12, 13 };
+        vector<int, allocator<int>> tt = { 12, 13 };
         test.insert(test.end(), tt.begin(), tt.end());
         REQUIRE(test.size() == 13);
         REQUIRE(test.capacity() >= 13);
         {
-            vector<int> r = { -2,13,13,13,-1,0,1,2,3,4,5,12,13 };
+            vector<int, allocator<int>> r = { -2,13,13,13,-1,0,1,2,3,4,5,12,13 };
             bool ok = true;
             for (int i = 0; i < 13; ++i) {
                 ok = ok && test[i] == r[i];
@@ -439,7 +456,7 @@ TEST_CASE("Data management") {
         REQUIRE(test.size() == 15);
         REQUIRE(test.capacity() >= 15);
         {
-            vector<int> r = { 67,23,-2,13,13,13,-1,0,1,2,3,4,5,12,13 };
+            vector<int, allocator<int>> r = { 67,23,-2,13,13,13,-1,0,1,2,3,4,5,12,13 };
             bool ok = true;
             for (int i = 0; i < 15; ++i) {
                 ok = ok && test[i] == r[i];
@@ -450,7 +467,7 @@ TEST_CASE("Data management") {
         REQUIRE(test.size() == 17);
         REQUIRE(test.capacity() >= 17);
         {
-            vector<int> r = { 67,23,67,23,-2,13,13,13,-1,0,1,2,3,4,5,12,13 };
+            vector<int, allocator<int>> r = { 67,23,67,23,-2,13,13,13,-1,0,1,2,3,4,5,12,13 };
             bool ok = true;
             for (int i = 0; i < 17; ++i) {
                 ok = ok && test[i] == r[i];
@@ -476,12 +493,12 @@ TEST_CASE("Data management") {
         REQUIRE(test[1] == 13);
     }
     SECTION("Erase") {
-        vector<int> test = { 0,1,2,3,4,5 };
+        vector<int, allocator<int>> test = { 0,1,2,3,4,5 };
         test.erase(test.begin() + 2);
         REQUIRE(test.size() == 5);
         REQUIRE(test.capacity() >= 5);
         {
-            vector<int> r = { 0,1,3,4,5 };
+            vector<int, allocator<int>> r = { 0,1,3,4,5 };
             bool ok = true;
             for (int i = 0; i < 5; ++i) {
                 ok = ok && test[i] == r[i];
@@ -492,7 +509,7 @@ TEST_CASE("Data management") {
         REQUIRE(test.size() == 3);
         REQUIRE(test.capacity() >= 3);
         {
-            vector<int> r = { 0,1,5 };
+            vector<int, allocator<int>> r = { 0,1,5 };
             bool ok = true;
             for (int i = 0; i < 3; ++i) {
                 ok = ok && test[i] == r[i];
@@ -503,15 +520,15 @@ TEST_CASE("Data management") {
 }
 
 TEST_CASE("Misc") {
-    vector<int> test = { 0,1,2,3,4 };
-    vector<int> test2 = { 5,6,7,8,9 };
+    vector<int, allocator<int>> test = { 0,1,2,3,4 };
+    vector<int, allocator<int>> test2 = { 5,6,7,8,9 };
     test.swap(test2);
     REQUIRE(test.size() == 5);
     REQUIRE(test.capacity() >= 5);
     REQUIRE(test2.size() == 5);
     REQUIRE(test2.capacity() >= 5);
     {
-        vector<int> r = { 0,1,2,3,4 };
+        vector<int, allocator<int>> r = { 0,1,2,3,4 };
         bool ok = true;
         for (int i = 0; i < 5; ++i) {
             ok = ok && test2[i] == r[i];
@@ -519,7 +536,7 @@ TEST_CASE("Misc") {
         REQUIRE(ok);
     }
     {
-        vector<int> r = { 5,6,7,8,9 };
+        vector<int, allocator<int>> r = { 5,6,7,8,9 };
         bool ok = true;
         for (int i = 0; i < 5; ++i) {
             ok = ok && test[i] == r[i];
@@ -657,5 +674,19 @@ TEST_CASE("Memory management") {
 }
 
 TEST_CASE("Emplace") {
-    
+    vector<int, allocator<int>> a(10U, 10);
+    a.emplace(a.begin(), 11);
+    REQUIRE(a.size() == 11);
+    REQUIRE(a[0] == 11);
+    a.emplace_back(12);
+    REQUIRE(a.size() == 12);
+    REQUIRE(a.back() == 12);
+}
+
+TEST_CASE("Exceptions check") {
+    copy_counter = 0;
+    destroy_counter = 0;
+    vector<Exceptional> a(10U);
+    REQUIRE_THROWS_AS(a.resize(100), std::exception);
+    REQUIRE(a.size() == 10);
 }

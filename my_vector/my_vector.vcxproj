@@ -145,6 +145,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="allocator.hpp" />
     <ClInclude Include="catch.hpp" />
     <ClInclude Include="my_vector.hpp" />
   </ItemGroup>

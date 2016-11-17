@@ -113,7 +113,6 @@ public:
 
     void swap(vector&) noexcept;
     void clear() noexcept;
-    allocator_type get_allocator() const;
 private:
     pointer elements_;
     size_type size_;
@@ -126,9 +125,19 @@ private:
 template <class T, class Allocator>
 void vector<T, Allocator>::allocate(size_type n) {
     size_type new_capacity = static_cast<size_type>(std::floor(pow(2, std::floor(std::log2(n)) + 1)));
-    T* new_elements = allocator_.allocate(new_capacity);
-    if (elements_ != nullptr && n > size_) {
-        std::uninitialized_copy(elements_, elements_ + size_, new_elements);
+    T* new_elements = nullptr;
+    try {
+        new_elements = allocator_.allocate(new_capacity);
+        if (elements_ != nullptr && n > size_) {
+            std::uninitialized_copy(elements_, elements_ + size_, new_elements);
+        }
+    }
+    catch (std::bad_alloc) {
+        throw;
+    }
+    catch (...) {
+        allocator_.deallocate(new_elements, new_capacity);
+        throw;
     }
     for (auto i = elements_; i < elements_ + size_; ++i) {
         allocator_.destroy(i);
@@ -455,7 +464,8 @@ void vector<T, Allocator>::emplace_back(Args&&... args) {
     if (size_ + 1 > capacity_) {
         allocate(size_ + 1);
     }
-    allocator_.construct(elements_ + (size_++), std::forward<Args>(args)...);
+    allocator_.construct(elements_ + size_, std::forward<Args>(args)...);
+    ++size_;
 }
 
 template <class T, class Allocator>
@@ -476,8 +486,4 @@ void vector<T, Allocator>::clear() noexcept {
     capacity_ = 0;
 }
 
-template <class T, class Allocator>
-typename vector<T, Allocator>::allocator_type vector<T, Allocator>::get_allocator() const {
-    return allocator_;
-}
 }
