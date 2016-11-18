@@ -13,6 +13,18 @@ public:
     }
 };
 
+int create_counter;
+
+class ConstructDestructible {
+public:
+    ConstructDestructible() {
+        ++create_counter;
+    }
+    ~ConstructDestructible() {
+        ++destroy_counter;
+    }
+};
+
 int copy_counter;
 
 class Exceptional {
@@ -552,46 +564,46 @@ TEST_CASE("Misc") {
 TEST_CASE("Memory management") {
     {
         destroy_counter = 0;
-        vector<Destroyable> a(10);
+        vector<Destroyable, allocator<Destroyable>> a(10);
     }
     REQUIRE(destroy_counter == 10);
     
     SECTION("Assignment") {
         {
             destroy_counter = 0;
-            vector<Destroyable> a(10);
+            vector<Destroyable, allocator<Destroyable>> a(10);
             a.assign(5, Destroyable());
             REQUIRE(destroy_counter == 11); // 10 for elements, 1 for temp
         }
         {
             destroy_counter = 0;
-            vector<Destroyable> a(10);
+            vector<Destroyable, allocator<Destroyable>> a(10);
             a.assign({Destroyable()});
             REQUIRE(destroy_counter == 12); // 10 for elements, 1 for temp, 1 created during initializer list construction?
         }
         {
             destroy_counter = 0;
-            vector<Destroyable> a(10);
-            vector<Destroyable> b(5);
+            vector<Destroyable, allocator<Destroyable>> a(10);
+            vector<Destroyable, allocator<Destroyable>> b(5);
             a.assign(b.begin(), b.end());
             REQUIRE(destroy_counter == 10);
         }
         {
             destroy_counter = 0;
-            vector<Destroyable> a(10);
-            vector<Destroyable> b(5);
+            vector<Destroyable, allocator<Destroyable>> a(10);
+            vector<Destroyable, allocator<Destroyable>> b(5);
             a = b;
             REQUIRE(destroy_counter == 10);
         }
         {
             destroy_counter = 0;
-            vector<Destroyable> a(10);
-            a = vector<Destroyable>(5);
+            vector<Destroyable, allocator<Destroyable>> a(10);
+            a = vector<Destroyable, allocator<Destroyable>>(5);
             REQUIRE(destroy_counter == 10);
         }
         {
             destroy_counter = 0;
-            vector<Destroyable> a(10);
+            vector<Destroyable, allocator<Destroyable>> a(10);
             a = {Destroyable()};
             REQUIRE(destroy_counter == 12); //two for init list
         }
@@ -599,19 +611,19 @@ TEST_CASE("Memory management") {
     SECTION("Resize") {
         {
             destroy_counter = 0;
-            vector<Destroyable> a(10);
+            vector<Destroyable, allocator<Destroyable>> a(10);
             a.resize(50);
             REQUIRE(destroy_counter == 11); //one temp in fill
         }
         {
             destroy_counter = 0;
-            vector<Destroyable> a(10);
+            vector<Destroyable, allocator<Destroyable>> a(10);
             a.resize(5);
             REQUIRE(destroy_counter == 5);
         }
         {
             destroy_counter = 0;
-            vector<Destroyable> a(10);
+            vector<Destroyable, allocator<Destroyable>> a(10);
             a.resize(5, Destroyable());
             REQUIRE(destroy_counter == 6); //1 temp
         }
@@ -619,53 +631,53 @@ TEST_CASE("Memory management") {
     SECTION("Insertion and other") {
         {
             destroy_counter = 0;
-            vector<Destroyable> a(15);
+            vector<Destroyable, allocator<Destroyable>> a(15);
             a.push_back(Destroyable());
             a.push_back(Destroyable());
             REQUIRE(destroy_counter == 18); //2 temp, 16 are copied
         }
         {
             destroy_counter = 0;
-            vector<Destroyable> a(15);
+            vector<Destroyable, allocator<Destroyable>> a(15);
             a.push_back(Destroyable());
             a.insert(a.begin() + 3, Destroyable());
             REQUIRE(destroy_counter == 18);
         }
         {
             destroy_counter = 0;
-            vector<Destroyable> a(15);
+            vector<Destroyable, allocator<Destroyable>> a(15);
             a.push_back(Destroyable());
             a.insert(a.begin() + 3, { Destroyable(), Destroyable() });
             REQUIRE(destroy_counter == 21);
         }
         {
             destroy_counter = 0;
-            vector<Destroyable> a(10);
+            vector<Destroyable, allocator<Destroyable>> a(10);
             a.erase(a.begin());
             REQUIRE(destroy_counter == 1);
         }
         {
             destroy_counter = 0;
-            vector<Destroyable> a(10);
+            vector<Destroyable, allocator<Destroyable>> a(10);
             a.erase(a.begin(), a.begin() + 3);
             REQUIRE(destroy_counter == 3);
         }
         {
             destroy_counter = 0;
-            vector<Destroyable> a(10);
+            vector<Destroyable, allocator<Destroyable>> a(10);
             a.clear();
             REQUIRE(destroy_counter == 10);
         }
         {
             destroy_counter = 0;
-            vector<Destroyable> a(15);
+            vector<Destroyable, allocator<Destroyable>> a(15);
             a.emplace_back(Destroyable());
             a.emplace(a.begin() + 3, Destroyable());
             REQUIRE(destroy_counter == 18);
         }
         {
             destroy_counter = 0;
-            vector<Destroyable> a(15);
+            vector<Destroyable, allocator<Destroyable>> a(15);
             a.emplace_back(Destroyable());
             a.emplace_back(Destroyable());
             REQUIRE(destroy_counter == 18); //2 temp, 16 are copied
@@ -686,7 +698,19 @@ TEST_CASE("Emplace") {
 TEST_CASE("Exceptions check") {
     copy_counter = 0;
     destroy_counter = 0;
-    vector<Exceptional> a(10U);
+    vector<Exceptional, allocator<Exceptional>> a(10U);
     REQUIRE_THROWS_AS(a.resize(100), std::exception);
     REQUIRE(a.size() == 10);
+}
+
+TEST_CASE("Allocator") {
+    create_counter = 0;
+    destroy_counter = 0;
+    allocator<ConstructDestructible> al_c;
+    ConstructDestructible* t = al_c.allocate(1);
+    al_c.construct(t);
+    REQUIRE(create_counter == 1);
+    al_c.destroy(t);
+    REQUIRE(destroy_counter == 1);
+    al_c.deallocate(t, 1);
 }

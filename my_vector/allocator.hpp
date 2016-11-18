@@ -18,6 +18,9 @@ struct memory_pool {
         pool = static_cast<typename allocator<T>::pointer>(::operator new(max_size * sizeof(T)));
         blocks = { typename allocator<T>::block(pool, max_size - 1, block_status::FREE) };
     };
+    ~memory_pool() {
+        ::operator delete(pool, max_size);
+    }
     typename allocator<T>::size_type max_size;
     typename allocator<T>::pointer pool;
     std::list<typename allocator<T>::block> blocks;
