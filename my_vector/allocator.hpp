@@ -53,7 +53,7 @@ public:
     void deallocate(pointer p, size_type n);
 
     template <class... Args> void construct(pointer p, Args&&... args) {
-        ::new (static_cast<void*>(p)) T(std::forward<Args>(args)...);
+        ::new (static_cast<void*>(p)) value_type(std::forward<Args>(args)...);
     };
     void destroy(pointer p) { p->~value_type(); };
 
