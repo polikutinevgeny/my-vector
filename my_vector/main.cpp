@@ -713,4 +713,5 @@ TEST_CASE("Allocator") {
     al_c.destroy(t);
     REQUIRE(destroy_counter == 1);
     al_c.deallocate(t, 1);
+    REQUIRE_THROWS_AS(al_c.allocate(1000000000), std::bad_alloc);
 }
